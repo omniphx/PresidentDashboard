@@ -1,3 +1,5 @@
+import type { Benchmark } from "@/lib/types";
+
 export function formatPercent(value: number | null) {
   if (value === null || Number.isNaN(value)) {
     return "N/A";
@@ -13,6 +15,26 @@ export function formatNumber(value: number | null) {
   }
 
   return value.toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  });
+}
+
+export function formatRate(value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    return "N/A";
+  }
+
+  return `${value.toFixed(2)}%`;
+}
+
+export function formatCurrency(value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    return "N/A";
+  }
+
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
     maximumFractionDigits: 2,
   });
 }
@@ -39,4 +61,29 @@ export function formatCompactDate(date: string | null) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(date));
+}
+
+export function formatMetricValue(benchmark: Benchmark, value: number | null) {
+  if (benchmark.valueFormat === "currency") {
+    return formatCurrency(value);
+  }
+
+  if (benchmark.valueFormat === "rate") {
+    return formatRate(value);
+  }
+
+  return formatNumber(value);
+}
+
+export function formatMetricChange(benchmark: Benchmark, value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    return "N/A";
+  }
+
+  if (benchmark.changeDisplay === "points") {
+    const sign = value > 0 ? "+" : "";
+    return `${sign}${value.toFixed(2)} pts`;
+  }
+
+  return formatPercent(value);
 }

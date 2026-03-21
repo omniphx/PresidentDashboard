@@ -1,17 +1,19 @@
-import { formatPercent } from "@/lib/format";
-import type { RelativePricePoint, ScoreboardEntry } from "@/lib/types";
+import { formatMetricChange, formatMetricValue } from "@/lib/format";
+import type { Benchmark, ComparisonChartMode, ComparisonPricePoint, ScoreboardEntry } from "@/lib/types";
 
 type PerformanceChartProps = {
+  benchmark: Benchmark;
+  chartMode: ComparisonChartMode;
   left: ScoreboardEntry;
   right: ScoreboardEntry;
-  leftSeries: RelativePricePoint[];
-  rightSeries: RelativePricePoint[];
-  leftComparisonReturnPct: number | null;
-  rightComparisonReturnPct: number | null;
+  leftSeries: ComparisonPricePoint[];
+  rightSeries: ComparisonPricePoint[];
+  leftComparisonValue: number | null;
+  rightComparisonValue: number | null;
 };
 
 function buildPath(
-  series: RelativePricePoint[],
+  series: ComparisonPricePoint[],
   width: number,
   height: number,
   min: number,
@@ -32,12 +34,14 @@ function buildPath(
 }
 
 export function PerformanceChart({
+  benchmark,
+  chartMode,
   left,
   right,
   leftSeries,
   rightSeries,
-  leftComparisonReturnPct,
-  rightComparisonReturnPct,
+  leftComparisonValue,
+  rightComparisonValue,
 }: PerformanceChartProps) {
   const width = 920;
   const height = 320;
@@ -53,9 +57,22 @@ export function PerformanceChart({
     rightSeries.at(-1)?.elapsedDays ?? 0,
     365,
   );
-  const maxElapsedYears = Math.max(1, Math.ceil(maxElapsedDays / 365));
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, 5);
+  const maxElapsedYears = Math.max(1, Math.floor(maxElapsedDays / 365));
+  const defaultMin = chartMode === "relative" ? 0 : 0;
+  const defaultMax = chartMode === "relative" ? (benchmark.changeDisplay === "points" ? 1 : 5) : 1;
+  const rawMin = values.length > 0 ? Math.min(...values) : defaultMin;
+  const rawMax = values.length > 0 ? Math.max(...values) : defaultMax;
+  const min = chartMode === "relative" ? Math.min(rawMin, 0) : rawMin;
+  const max = chartMode === "relative" ? Math.max(rawMax, defaultMax) : rawMax === rawMin ? rawMax + 1 : rawMax;
+  const chartTitle = chartMode === "relative" ? "Relative term change" : "Absolute term values";
+  const chartDescription =
+    chartMode === "relative"
+      ? "Compare how the selected series moved after each inauguration, using elapsed years in office."
+      : "Compare the raw level of the selected series over each presidency, aligned by elapsed years in office.";
+  const chartNote =
+    chartMode === "relative"
+      ? "Lines are aligned by years since inauguration. Longer presidencies extend farther across the x-axis, and ongoing terms only extend through the years completed so far."
+      : "Lines are aligned by years since inauguration and keep each series on its original scale, so level differences stay visible across presidencies.";
 
   const leftPath = buildPath(leftSeries, plotWidth, plotHeight, min, max, maxElapsedDays);
   const rightPath = buildPath(rightSeries, plotWidth, plotHeight, min, max, maxElapsedDays);
@@ -63,21 +80,41 @@ export function PerformanceChart({
   const yearTicks = Array.from({ length: maxElapsedYears + 1 }, (_, index) => ({
     label: index === 0 ? "Year 0" : `Year ${index}`,
     elapsedDays: index * 365,
-  }));
+  })).filter((tick, index, ticks) => {
+    if (index === 0) {
+      return true;
+    }
+
+    const isWithinRange = tick.elapsedDays <= maxElapsedDays;
+    const previousTick = ticks[index - 1];
+
+    return isWithinRange && tick.elapsedDays > previousTick.elapsedDays;
+  });
 
   return (
     <section className="panel-strong rounded-3xl p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-[var(--accent)]">Head To Head</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-[0.02em] text-[var(--text)]">Relative term performance</h2>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[0.02em] text-[var(--text)]">
+            {chartTitle}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+            {chartDescription}
+          </p>
         </div>
         <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.14em]">
           <div className="pill rounded-full px-4 py-2 text-[var(--muted)]">
-            <span className="text-[var(--accent)]">{left.displayName}</span> {formatPercent(leftComparisonReturnPct)}
+            <span className="text-[var(--accent)]">{left.displayName}</span>{" "}
+            {chartMode === "relative"
+              ? formatMetricChange(benchmark, leftComparisonValue)
+              : formatMetricValue(benchmark, leftComparisonValue)}
           </div>
           <div className="pill rounded-full px-4 py-2 text-[var(--muted)]">
-            <span className="text-cyan-700">{right.displayName}</span> {formatPercent(rightComparisonReturnPct)}
+            <span className="text-cyan-700">{right.displayName}</span>{" "}
+            {chartMode === "relative"
+              ? formatMetricChange(benchmark, rightComparisonValue)
+              : formatMetricValue(benchmark, rightComparisonValue)}
           </div>
         </div>
       </div>
@@ -92,7 +129,13 @@ export function PerformanceChart({
                 <text
                   x={x}
                   y={height - 8}
-                  textAnchor={tick.elapsedDays === 0 ? "start" : tick.elapsedDays >= maxElapsedDays ? "end" : "middle"}
+                  textAnchor={
+                    tick.elapsedDays === 0
+                      ? "start"
+                      : tick.elapsedDays >= maxElapsedDays
+                        ? "end"
+                        : "middle"
+                  }
                   fill="rgba(70,48,18,0.68)"
                   fontSize="12"
                 >
@@ -114,7 +157,9 @@ export function PerformanceChart({
                   strokeDasharray="6 8"
                 />
                 <text x="0" y={Math.max(chartTop + 12, y - 8)} fill="rgba(70,48,18,0.68)" fontSize="12">
-                  {formatPercent(tick)}
+                  {chartMode === "relative"
+                    ? formatMetricChange(benchmark, tick)
+                    : formatMetricValue(benchmark, tick)}
                 </text>
               </g>
             );
@@ -126,7 +171,7 @@ export function PerformanceChart({
         </svg>
       </div>
       <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-        Lines are aligned by years since inauguration. Longer presidencies extend farther across the x-axis, and ongoing terms only extend through the years completed so far.
+        {chartNote}
       </p>
     </section>
   );

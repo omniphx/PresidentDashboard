@@ -1,3 +1,9 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
+import type { ComparisonChartMode } from "@/lib/types";
+
 type ComparisonOption = {
   id: string;
   displayName: string;
@@ -7,6 +13,7 @@ type ComparisonControlsProps = {
   benchmarkId: string;
   leftId: string;
   rightId: string;
+  chartMode: ComparisonChartMode;
   options: ComparisonOption[];
 };
 
@@ -14,16 +21,56 @@ export function ComparisonControls({
   benchmarkId,
   leftId,
   rightId,
+  chartMode,
   options,
 }: ComparisonControlsProps) {
+  const router = useRouter();
+
+  const navigate = (nextLeftId: string, nextRightId: string, nextMode: ComparisonChartMode) => {
+    const params = new URLSearchParams({
+      benchmark: benchmarkId,
+      left: nextLeftId,
+      right: nextRightId,
+      mode: nextMode,
+    });
+
+    router.push(`/?${params.toString()}`);
+  };
+
   return (
-    <form className="grid gap-3 md:grid-cols-2" action="/">
-      <input type="hidden" name="benchmark" value={benchmarkId} />
+    <div className="grid gap-3 md:grid-cols-2">
+      <fieldset className="md:col-span-2">
+        <legend className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Chart Mode</legend>
+        <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-[var(--line)] bg-white p-1">
+          {[
+            { value: "relative", label: "Relative" },
+            { value: "absolute", label: "Absolute" },
+          ].map((option) => {
+            const checked = chartMode === option.value;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => navigate(leftId, rightId, option.value as ComparisonChartMode)}
+                className={`flex cursor-pointer items-center justify-center rounded-xl px-3 py-2 text-xs uppercase tracking-[0.18em] transition ${
+                  checked
+                    ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                    : "text-[var(--muted)] hover:text-[var(--text)]"
+                }`}
+                aria-pressed={checked}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
       <label className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
         Compare Left
         <select
-          name="left"
-          defaultValue={leftId}
+          value={leftId}
+          onChange={(event) => navigate(event.target.value, rightId, chartMode)}
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3 text-sm text-[var(--text)] outline-none"
         >
           {options.map((president) => (
@@ -36,8 +83,8 @@ export function ComparisonControls({
       <label className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
         Compare Right
         <select
-          name="right"
-          defaultValue={rightId}
+          value={rightId}
+          onChange={(event) => navigate(leftId, event.target.value, chartMode)}
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3 text-sm text-[var(--text)] outline-none"
         >
           {options.map((president) => (
@@ -47,12 +94,6 @@ export function ComparisonControls({
           ))}
         </select>
       </label>
-      <button
-        type="submit"
-        className="rounded-xl border border-[var(--accent)] bg-[var(--accent)] px-4 py-3 text-xs uppercase tracking-[0.22em] text-[#fff7f1] transition hover:opacity-90 md:col-span-2"
-      >
-        Update Matchup
-      </button>
-    </form>
+    </div>
   );
 }

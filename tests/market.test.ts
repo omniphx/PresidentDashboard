@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRelativeSeries, calculateTermPerformance } from "@/lib/market";
+import { buildAbsoluteSeries, buildRelativeSeries, calculateTermPerformance } from "@/lib/market";
 import type { PricePoint, ScoreboardEntry } from "@/lib/types";
 
 const series: PricePoint[] = [
@@ -12,7 +12,7 @@ const series: PricePoint[] = [
 ];
 
 describe("calculateTermPerformance", () => {
-  it("calculates return metrics for a covered window", () => {
+  it("calculates percent-change metrics for market series", () => {
     const performance = calculateTermPerformance(
       "dow",
       series,
@@ -23,9 +23,24 @@ describe("calculateTermPerformance", () => {
 
     expect(performance.startValue).toBe(100);
     expect(performance.endValue).toBe(110);
-    expect(performance.totalReturnPct).toBeCloseTo(10, 2);
-    expect(performance.maxDrawdownPct).toBeCloseTo(-4.35, 2);
-    expect(performance.volatilityPct).toBeGreaterThan(0);
+    expect(performance.totalChange).toBeCloseTo(10, 2);
+    expect(performance.annualizedChange).toBeGreaterThan(0);
+  });
+
+  it("calculates point-change metrics for rate series", () => {
+    const performance = calculateTermPerformance(
+      "jobs",
+      [
+        { date: "2020-01-01", close: 5 },
+        { date: "2021-01-01", close: 6.25 },
+      ],
+      "2020-01-01",
+      "2021-01-01",
+      "test-president",
+    );
+
+    expect(performance.totalChange).toBeCloseTo(1.25, 2);
+    expect(performance.annualizedChange).toBeCloseTo(1.25, 1);
   });
 
   it("returns null metrics when the benchmark has no coverage", () => {
@@ -37,13 +52,13 @@ describe("calculateTermPerformance", () => {
       "missing-president",
     );
 
-    expect(performance.totalReturnPct).toBeNull();
+    expect(performance.totalChange).toBeNull();
     expect(performance.series).toEqual([]);
   });
 });
 
 describe("buildRelativeSeries", () => {
-  it("normalizes a price series to relative percent gain", () => {
+  it("normalizes a price series to relative percent gain for market series", () => {
     const entry: ScoreboardEntry = {
       id: "test-president",
       president: "Test President",
@@ -58,10 +73,8 @@ describe("buildRelativeSeries", () => {
         benchmarkId: "dow",
         startValue: 100,
         endValue: 110,
-        totalReturnPct: 10,
-        annualizedReturnPct: null,
-        maxDrawdownPct: null,
-        volatilityPct: null,
+        totalChange: 10,
+        annualizedChange: null,
         coverageStart: "2020-01-02",
         coverageEnd: "2020-01-08",
         series,
@@ -74,6 +87,40 @@ describe("buildRelativeSeries", () => {
       { date: "2020-01-06", close: 3, elapsedDays: 5, progressRatio: 0.5 },
       { date: "2020-01-07", close: 15, elapsedDays: 6, progressRatio: 0.6 },
       { date: "2020-01-08", close: 10, elapsedDays: 7, progressRatio: 0.7 },
+    ]);
+  });
+
+  it("uses absolute point moves for macro rate series", () => {
+    const entry: ScoreboardEntry = {
+      id: "biden",
+      president: "Joseph R. Biden Jr.",
+      displayName: "Joe Biden",
+      orderLabel: "46th",
+      party: "Democratic",
+      startDate: "2021-01-20",
+      endDate: "2025-01-20",
+      inauguratedOn: "2021-01-20",
+      performance: {
+        presidentId: "biden",
+        benchmarkId: "jobs",
+        startValue: 6.2,
+        endValue: 3.7,
+        totalChange: -2.5,
+        annualizedChange: null,
+        coverageStart: "2021-02-01",
+        coverageEnd: "2025-01-01",
+        series: [
+          { date: "2021-02-01", close: 6.2 },
+          { date: "2022-02-01", close: 4.0 },
+          { date: "2025-01-01", close: 3.7 },
+        ],
+      },
+    };
+
+    expect(buildRelativeSeries(entry)).toEqual([
+      { date: "2021-02-01", close: 0, elapsedDays: 12, progressRatio: expect.any(Number) },
+      { date: "2022-02-01", close: -2.2, elapsedDays: 377, progressRatio: expect.any(Number) },
+      { date: "2025-01-01", close: -2.5, elapsedDays: 1442, progressRatio: expect.any(Number) },
     ]);
   });
 
@@ -92,10 +139,8 @@ describe("buildRelativeSeries", () => {
         benchmarkId: "dow",
         startValue: 100,
         endValue: 105,
-        totalReturnPct: 5,
-        annualizedReturnPct: null,
-        maxDrawdownPct: null,
-        volatilityPct: null,
+        totalChange: 5,
+        annualizedChange: null,
         coverageStart: "2025-01-21",
         coverageEnd: "2025-03-21",
         series: [
@@ -111,48 +156,38 @@ describe("buildRelativeSeries", () => {
     expect(relativeSeries[1]?.close).toBe(5);
     expect(relativeSeries[1]?.progressRatio).toBeLessThan(0.2);
   });
+});
 
-  it("keeps completed two-term presidents at their full observed term length", () => {
+describe("buildAbsoluteSeries", () => {
+  it("keeps raw values while preserving elapsed-term alignment", () => {
     const entry: ScoreboardEntry = {
-      id: "obama",
-      president: "Barack Obama",
-      displayName: "Barack Obama",
-      orderLabel: "44th",
-      party: "Democratic",
-      startDate: "2009-01-20",
-      endDate: "2017-01-20",
-      inauguratedOn: "2009-01-20",
+      id: "test-president",
+      president: "Test President",
+      displayName: "Test President",
+      orderLabel: "0th",
+      party: "Independent",
+      startDate: "2020-01-01",
+      endDate: "2020-01-11",
+      inauguratedOn: "2020-01-01",
       performance: {
-        presidentId: "obama",
+        presidentId: "test-president",
         benchmarkId: "dow",
         startValue: 100,
-        endValue: 160,
-        totalReturnPct: 60,
-        annualizedReturnPct: null,
-        maxDrawdownPct: null,
-        volatilityPct: null,
-        coverageStart: "2009-01-21",
-        coverageEnd: "2017-01-19",
-        series: [
-          { date: "2009-01-21", close: 100 },
-          { date: "2010-01-20", close: 110 },
-          { date: "2011-01-20", close: 120 },
-          { date: "2012-01-20", close: 130 },
-          { date: "2013-01-18", close: 140 },
-          { date: "2014-01-21", close: 150 },
-          { date: "2017-01-19", close: 160 },
-        ],
+        endValue: 110,
+        totalChange: 10,
+        annualizedChange: null,
+        coverageStart: "2020-01-02",
+        coverageEnd: "2020-01-08",
+        series,
       },
     };
 
-    const relativeSeries = buildRelativeSeries(entry);
-
-    expect(relativeSeries).toHaveLength(7);
-    expect(relativeSeries.at(-1)).toMatchObject({
-      date: "2017-01-19",
-      close: 60,
-    });
-    expect(relativeSeries.at(-1)?.elapsedDays).toBeGreaterThan(365 * 7);
-    expect(relativeSeries.at(-1)?.progressRatio).toBeCloseTo(1, 3);
+    expect(buildAbsoluteSeries(entry)).toEqual([
+      { date: "2020-01-02", close: 100, elapsedDays: 1, progressRatio: 0.1 },
+      { date: "2020-01-03", close: 105, elapsedDays: 2, progressRatio: 0.2 },
+      { date: "2020-01-06", close: 103, elapsedDays: 5, progressRatio: 0.5 },
+      { date: "2020-01-07", close: 115, elapsedDays: 6, progressRatio: 0.6 },
+      { date: "2020-01-08", close: 110, elapsedDays: 7, progressRatio: 0.7 },
+    ]);
   });
 });

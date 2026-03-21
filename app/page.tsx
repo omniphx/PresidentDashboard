@@ -7,12 +7,14 @@ import { PerformanceChart } from "@/components/performance-chart";
 import { PresidentTable } from "@/components/president-table";
 import { getBenchmark } from "@/lib/benchmarks";
 import {
+  buildAbsoluteSeries,
+  buildRelativeSeries,
   getComparison,
   getDefaultComparisonIds,
   getLiveQuote,
   getScoreboard,
 } from "@/lib/market";
-import type { BenchmarkId } from "@/lib/types";
+import type { BenchmarkId, ComparisonChartMode } from "@/lib/types";
 
 type HomePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -27,6 +29,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const defaults = getDefaultComparisonIds(benchmark.id);
   const leftId = Array.isArray(params.left) ? params.left[0] : params.left ?? defaults.leftId;
   const rightId = Array.isArray(params.right) ? params.right[0] : params.right ?? defaults.rightId;
+  const chartModeParam = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  const chartMode: ComparisonChartMode = chartModeParam === "absolute" ? "absolute" : "relative";
 
   const [scoreboardResult, comparisonResult, quoteResult] = await Promise.allSettled([
     getScoreboard(benchmark.id),
@@ -48,20 +52,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         ? quoteResult.reason.message
         : "Unknown live quote error."
       : undefined;
-  const coveredScoreboard = scoreboard.filter((entry) => entry.performance.totalReturnPct !== null);
+  const coveredScoreboard = scoreboard.filter((entry) => entry.performance.totalChange !== null);
   const hiddenCount = scoreboard.length - coveredScoreboard.length;
   const sortMostRecentFirst = <T extends { startDate: string }>(entries: T[]) =>
     [...entries].sort((left, right) => right.startDate.localeCompare(left.startDate));
-  const comparisonOptions =
-    coveredScoreboard.length > 0
-      ? sortMostRecentFirst(coveredScoreboard).map((entry) => ({
-          id: entry.id,
-          displayName: entry.displayName,
-        }))
-      : sortMostRecentFirst(scoreboard).map((entry) => ({
-          id: entry.id,
-          displayName: entry.displayName,
-        }));
+  const comparisonOptions = sortMostRecentFirst(
+    scoreboard.filter((entry) => entry.startDate >= benchmark.inceptionDate),
+  ).map((entry) => ({
+    id: entry.id,
+    displayName:
+      entry.performance.totalChange === null ? `${entry.displayName} (No data)` : entry.displayName,
+  }));
 
   return (
     <main className="grid-noise min-h-screen px-4 py-4 md:px-6 md:py-5">
@@ -71,14 +72,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div>
               <p className="text-[11px] uppercase tracking-[0.32em] text-[var(--accent)]">Presidential Markets</p>
               <h1 className="mt-2 text-2xl font-semibold tracking-[0.01em] text-[var(--text)] md:text-3xl">
-                U.S. presidents against the market.
+                U.S. presidents against markets and macro.
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-                Compare presidential terms across major benchmarks using daily historical performance and a live market snapshot.
+                Compare presidential terms across stock indexes, inflation-adjusted oil, the job market, and interest rates.
               </p>
             </div>
             <div className="grid gap-1 text-sm text-[var(--muted)] md:text-right">
-              <p><span className="text-[var(--text)]">Default benchmark:</span> {benchmark.label}</p>
+              <p><span className="text-[var(--text)]">Selected series:</span> {benchmark.label}</p>
               <p><span className="text-[var(--text)]">Coverage starts:</span> {benchmark.inceptionDate}</p>
             </div>
           </div>
@@ -89,18 +90,24 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
             <div className="grid gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent)]">Market View</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent)]">Series View</p>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                  Switch the benchmark and keep the same head-to-head matchup in view.
+                  Switch the series and keep the same head-to-head matchup in view.
                 </p>
               </div>
-              <BenchmarkTabs activeBenchmarkId={benchmark.id} leftId={leftId} rightId={rightId} />
+              <BenchmarkTabs
+                activeBenchmarkId={benchmark.id}
+                leftId={leftId}
+                rightId={rightId}
+                chartMode={chartMode}
+              />
             </div>
             <div>
               <ComparisonControls
                 benchmarkId={benchmark.id}
                 leftId={leftId}
                 rightId={rightId}
+                chartMode={chartMode}
                 options={comparisonOptions}
               />
             </div>
@@ -108,19 +115,37 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </section>
         {comparison ? (
           <PerformanceChart
+            benchmark={benchmark}
+            chartMode={chartMode}
             left={comparison.left}
             right={comparison.right}
-            leftSeries={comparison.leftRelativeSeries}
-            rightSeries={comparison.rightRelativeSeries}
-            leftComparisonReturnPct={comparison.leftComparisonReturnPct}
-            rightComparisonReturnPct={comparison.rightComparisonReturnPct}
+            leftSeries={
+              chartMode === "absolute"
+                ? buildAbsoluteSeries(comparison.left)
+                : buildRelativeSeries(comparison.left)
+            }
+            rightSeries={
+              chartMode === "absolute"
+                ? buildAbsoluteSeries(comparison.right)
+                : buildRelativeSeries(comparison.right)
+            }
+            leftComparisonValue={
+              chartMode === "absolute"
+                ? comparison.left.performance.endValue
+                : comparison.leftComparisonReturnPct
+            }
+            rightComparisonValue={
+              chartMode === "absolute"
+                ? comparison.right.performance.endValue
+                : comparison.rightComparisonReturnPct
+            }
           />
         ) : null}
         <section className="grid gap-4 lg:grid-cols-[1.05fr_1fr]">
           {quote ? <LiveQuoteCard benchmark={benchmark} quote={quote} /> : <div />}
-          {coveredScoreboard.length > 0 ? <KpiCards scoreboard={coveredScoreboard} /> : <div />}
+          {coveredScoreboard.length > 0 ? <KpiCards benchmark={benchmark} scoreboard={coveredScoreboard} /> : <div />}
         </section>
-        <PresidentTable scoreboard={coveredScoreboard} hiddenCount={hiddenCount} />
+        <PresidentTable benchmark={benchmark} scoreboard={coveredScoreboard} hiddenCount={hiddenCount} />
       </div>
     </main>
   );

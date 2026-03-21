@@ -1,4 +1,5 @@
-export type BenchmarkId = "dow" | "nasdaq" | "sp500";
+export type BenchmarkId = "dow" | "nasdaq" | "sp500" | "oil" | "jobs" | "rates";
+export type ComparisonChartMode = "relative" | "absolute";
 
 export type PresidentTerm = {
   id: string;
@@ -11,14 +12,39 @@ export type PresidentTerm = {
   inauguratedOn: string;
 };
 
+export type HistoricalSource =
+  | {
+      kind: "csv";
+      historyFile: string;
+      historyColumn: string;
+    }
+  | {
+      kind: "fred";
+      seriesId: string;
+    }
+  | {
+      kind: "real-oil";
+      oilSeriesId: string;
+      cpiSeriesId: string;
+    };
+
 export type Benchmark = {
   id: BenchmarkId;
   label: string;
-  ticker: string;
+  ticker?: string;
   inceptionDate: string;
   description: string;
-  historyFile: string;
-  historyColumn: string;
+  historySource: HistoricalSource;
+  changeDisplay: "percent" | "points";
+  valueFormat: "number" | "currency" | "rate";
+  supportsLiveQuote: boolean;
+  latestLabel: string;
+  sourceLabel: string;
+  secondarySnapshot?: {
+    label: string;
+    seriesId: string;
+    valueFormat: "number" | "currency" | "rate";
+  };
 };
 
 export type PricePoint = {
@@ -26,20 +52,23 @@ export type PricePoint = {
   close: number;
 };
 
-export type RelativePricePoint = {
+export type ComparisonPricePoint = {
   date: string;
   close: number;
   elapsedDays: number;
   progressRatio: number;
 };
 
-export type LiveQuote = {
+export type MetricSnapshot = {
   benchmarkId: BenchmarkId;
-  price: number;
-  changePct: number;
+  value: number;
+  delta: number | null;
   asOf: string;
   isDelayed: boolean;
   source: string;
+  secondaryValue?: number | null;
+  secondaryLabel?: string;
+  secondaryValueFormat?: "number" | "currency" | "rate";
 };
 
 export type TermMarketPerformance = {
@@ -47,10 +76,8 @@ export type TermMarketPerformance = {
   benchmarkId: BenchmarkId;
   startValue: number | null;
   endValue: number | null;
-  totalReturnPct: number | null;
-  annualizedReturnPct: number | null;
-  maxDrawdownPct: number | null;
-  volatilityPct: number | null;
+  totalChange: number | null;
+  annualizedChange: number | null;
   coverageStart: string | null;
   coverageEnd: string | null;
   series: PricePoint[];
