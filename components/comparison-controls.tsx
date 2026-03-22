@@ -41,7 +41,7 @@ export function ComparisonControls({
     <div className="grid gap-3 md:grid-cols-2">
       <fieldset className="md:col-span-2">
         <legend className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Chart Mode</legend>
-        <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-[var(--line)] bg-white p-1">
+        <div className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-[var(--line)] bg-white p-1">
           {[
             { value: "relative", label: "Relative" },
             { value: "absolute", label: "Absolute" },
@@ -53,7 +53,7 @@ export function ComparisonControls({
                 key={option.value}
                 type="button"
                 onClick={() => navigate(leftId, rightId, option.value as ComparisonChartMode)}
-                className={`flex cursor-pointer items-center justify-center rounded-xl px-3 py-2 text-xs uppercase tracking-[0.18em] transition ${
+                className={`flex min-h-10 cursor-pointer items-center justify-center rounded-lg px-3 py-2 !text-sm font-medium tracking-[0.08em] transition ${
                   checked
                     ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                     : "text-[var(--muted)] hover:text-[var(--text)]"
@@ -71,7 +71,7 @@ export function ComparisonControls({
         <select
           value={leftId}
           onChange={(event) => navigate(event.target.value, rightId, chartMode)}
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3 text-sm text-[var(--text)] outline-none"
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3 !text-sm text-[var(--text)] outline-none"
         >
           {options.map((president) => (
             <option key={president.id} value={president.id}>
@@ -85,7 +85,7 @@ export function ComparisonControls({
         <select
           value={rightId}
           onChange={(event) => navigate(leftId, event.target.value, chartMode)}
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3 text-sm text-[var(--text)] outline-none"
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3 !text-sm text-[var(--text)] outline-none"
         >
           {options.map((president) => (
             <option key={president.id} value={president.id}>

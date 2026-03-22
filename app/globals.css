@@ -44,7 +44,7 @@ a {
 
 button,
 select {
-  font: inherit;
+  font-family: inherit;
 }
 
 .grid-noise {
