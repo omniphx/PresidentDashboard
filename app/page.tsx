@@ -10,8 +10,10 @@ import {
   buildAbsoluteSeries,
   buildRelativeSeries,
   getComparison,
-  getDefaultComparisonIds,
   getLiveQuote,
+  getAvailableComparisonIds,
+  getDefaultComparisonIds,
+  normalizeComparisonIds,
   getScoreboard,
 } from "@/lib/market";
 import type { BenchmarkId, ComparisonChartMode } from "@/lib/types";
@@ -38,11 +40,20 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     : params.mode;
   const chartMode: ComparisonChartMode =
     chartModeParam === "absolute" ? "absolute" : "relative";
+  const availableComparisonIds = getAvailableComparisonIds(benchmark.id);
+  const hasAvailableComparisons = availableComparisonIds.length > 0;
+  const normalizedComparisonIds = normalizeComparisonIds(benchmark.id, leftId, rightId);
+  const resolvedLeftId = hasAvailableComparisons
+    ? normalizedComparisonIds.leftId
+    : defaults.leftId;
+  const resolvedRightId = hasAvailableComparisons
+    ? normalizedComparisonIds.rightId
+    : defaults.rightId;
 
   const [scoreboardResult, comparisonResult, quoteResult] =
     await Promise.allSettled([
       getScoreboard(benchmark.id),
-      getComparison(benchmark.id, leftId, rightId),
+      getComparison(benchmark.id, resolvedLeftId, resolvedRightId),
       getLiveQuote(benchmark.id),
     ]);
   const scoreboard =
@@ -147,16 +158,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </div>
               <BenchmarkTabs
                 activeBenchmarkId={benchmark.id}
-                leftId={leftId}
-                rightId={rightId}
+                leftId={resolvedLeftId}
+                rightId={resolvedRightId}
                 chartMode={chartMode}
               />
             </div>
             <div>
               <ComparisonControls
                 benchmarkId={benchmark.id}
-                leftId={leftId}
-                rightId={rightId}
+                leftId={resolvedLeftId}
+                rightId={resolvedRightId}
                 chartMode={chartMode}
                 options={comparisonOptions}
               />

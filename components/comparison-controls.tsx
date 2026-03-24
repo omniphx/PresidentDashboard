@@ -55,7 +55,7 @@ export function ComparisonControls({
                 onClick={() => navigate(leftId, rightId, option.value as ComparisonChartMode)}
                 className={`flex min-h-10 cursor-pointer items-center justify-center rounded-lg px-3 py-2 !text-sm font-medium tracking-[0.08em] transition ${
                   checked
-                    ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                    ? "bg-[var(--accent-soft)] text-[var(--accent-strong)] ring-1 ring-inset ring-[rgba(122,47,0,0.14)]"
                     : "text-[var(--muted)] hover:text-[var(--text)]"
                 }`}
                 aria-pressed={checked}

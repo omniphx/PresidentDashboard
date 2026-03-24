@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAbsoluteSeries, buildRelativeSeries, calculateTermPerformance } from "@/lib/market";
+import {
+  buildAbsoluteSeries,
+  buildRelativeSeries,
+  calculateTermPerformance,
+  normalizeComparisonIds,
+} from "@/lib/market";
 import type { PricePoint, ScoreboardEntry } from "@/lib/types";
 
 const series: PricePoint[] = [
@@ -189,5 +194,14 @@ describe("buildAbsoluteSeries", () => {
       { date: "2020-01-07", close: 115, elapsedDays: 6, progressRatio: 0.6 },
       { date: "2020-01-08", close: 110, elapsedDays: 7, progressRatio: 0.7 },
     ]);
+  });
+});
+
+describe("normalizeComparisonIds", () => {
+  it("falls back to the most recent covered term when a selection predates the benchmark", () => {
+    expect(normalizeComparisonIds("nasdaq", "lbj", "obama")).toEqual({
+      leftId: "trump-47",
+      rightId: "obama",
+    });
   });
 });

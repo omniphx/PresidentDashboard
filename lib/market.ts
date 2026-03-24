@@ -493,14 +493,32 @@ export async function getComparison(benchmarkId: BenchmarkId, leftId: string, ri
   };
 }
 
-export function getDefaultComparisonIds(benchmarkId: BenchmarkId) {
-  const available = presidentTerms
+export function getAvailableComparisonIds(benchmarkId: BenchmarkId) {
+  return [...presidentTerms]
     .filter((term) => new Date(term.startDate) >= new Date(getBenchmark(benchmarkId).inceptionDate))
-    .slice(-2);
+    .sort((left, right) => right.startDate.localeCompare(left.startDate))
+    .map((term) => term.id);
+}
+
+export function normalizeComparisonIds(benchmarkId: BenchmarkId, leftId: string, rightId: string) {
+  const availableIds = getAvailableComparisonIds(benchmarkId);
+  const fallbackIds = getDefaultComparisonIds(benchmarkId);
+  const primaryFallbackId = availableIds[0] ?? fallbackIds.rightId;
+  const normalizedLeftId = availableIds.includes(leftId) ? leftId : primaryFallbackId;
+  const normalizedRightId = availableIds.includes(rightId) ? rightId : primaryFallbackId;
 
   return {
-    leftId: available[0]?.id ?? presidentTerms.at(-2)?.id ?? presidentTerms[0].id,
-    rightId: available[1]?.id ?? presidentTerms.at(-1)?.id ?? presidentTerms[1].id,
+    leftId: normalizedLeftId,
+    rightId: normalizedRightId,
+  };
+}
+
+export function getDefaultComparisonIds(benchmarkId: BenchmarkId) {
+  const available = getAvailableComparisonIds(benchmarkId).reverse().slice(-2);
+
+  return {
+    leftId: available[0] ?? presidentTerms.at(-2)?.id ?? presidentTerms[0].id,
+    rightId: available[1] ?? presidentTerms.at(-1)?.id ?? presidentTerms[1].id,
   };
 }
 
