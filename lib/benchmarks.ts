@@ -39,7 +39,7 @@ export const benchmarks: Benchmark[] = [
     id: "sp500",
     label: "S&P 500",
     ticker: "^GSPC",
-    inceptionDate: "1957-03-04",
+    inceptionDate: "1789-05-01",
     description: "Large-cap benchmark often used as the U.S. equity baseline.",
     historySource: {
       kind: "csv",
