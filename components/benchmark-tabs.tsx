@@ -3,6 +3,7 @@
 import { startTransition, useOptimistic } from "react";
 import { useRouter } from "next/navigation";
 
+import { useChartLoading } from "@/components/chart-loading-context";
 import { benchmarks } from "@/lib/benchmarks";
 import type { BenchmarkId, ComparisonChartMode } from "@/lib/types";
 
@@ -20,6 +21,7 @@ export function BenchmarkTabs({
   chartMode,
 }: BenchmarkTabsProps) {
   const router = useRouter();
+  const { beginChartNavigation, isChartLoading } = useChartLoading();
   const [optimisticBenchmarkId, setOptimisticBenchmarkId] = useOptimistic(
     activeBenchmarkId,
     (_currentBenchmarkId, nextBenchmarkId: BenchmarkId) => nextBenchmarkId,
@@ -28,6 +30,12 @@ export function BenchmarkTabs({
     `/?benchmark=${benchmarkId}&left=${leftId}&right=${rightId}&mode=${chartMode}`;
   const navigate = (benchmarkId: BenchmarkId) => {
     startTransition(() => {
+      beginChartNavigation({
+        benchmarkId,
+        leftId,
+        rightId,
+        chartMode,
+      });
       setOptimisticBenchmarkId(benchmarkId);
       router.push(buildHref(benchmarkId), { scroll: false });
     });
@@ -43,6 +51,7 @@ export function BenchmarkTabs({
             onChange={(event) => navigate(event.target.value as BenchmarkId)}
             className="rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[13px] font-medium tracking-[0.06em] text-[var(--text)]"
             aria-label="Select series"
+            aria-busy={isChartLoading}
           >
             {benchmarks.map((benchmark) => (
               <option key={benchmark.id} value={benchmark.id}>
@@ -67,6 +76,7 @@ export function BenchmarkTabs({
                   : "pill border-[var(--line)] bg-white/55 text-[var(--muted)] hover:border-[var(--line-strong)] hover:text-[var(--text)]"
               }`}
               aria-pressed={isActive}
+              aria-busy={isChartLoading && isActive}
             >
               {benchmark.label}
             </button>

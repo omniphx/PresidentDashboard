@@ -3,7 +3,8 @@
 import { startTransition, useOptimistic } from "react";
 import { useRouter } from "next/navigation";
 
-import type { ComparisonChartMode } from "@/lib/types";
+import { useChartLoading } from "@/components/chart-loading-context";
+import type { BenchmarkId, ComparisonChartMode } from "@/lib/types";
 
 type ComparisonOption = {
   id: string;
@@ -11,7 +12,7 @@ type ComparisonOption = {
 };
 
 type ComparisonControlsProps = {
-  benchmarkId: string;
+  benchmarkId: BenchmarkId;
   leftId: string;
   rightId: string;
   chartMode: ComparisonChartMode;
@@ -26,6 +27,7 @@ export function ComparisonControls({
   options,
 }: ComparisonControlsProps) {
   const router = useRouter();
+  const { beginChartNavigation, isChartLoading } = useChartLoading();
   const [optimisticSelection, setOptimisticSelection] = useOptimistic(
     { leftId, rightId, chartMode },
     (
@@ -51,6 +53,12 @@ export function ComparisonControls({
     });
 
     startTransition(() => {
+      beginChartNavigation({
+        benchmarkId,
+        leftId: nextLeftId,
+        rightId: nextRightId,
+        chartMode: nextMode,
+      });
       setOptimisticSelection({
         leftId: nextLeftId,
         rightId: nextRightId,
@@ -88,6 +96,7 @@ export function ComparisonControls({
                     : "text-[var(--muted)] hover:text-[var(--text)]"
                 }`}
                 aria-pressed={checked}
+                aria-busy={isChartLoading && checked}
               >
                 {option.label}
               </button>
@@ -107,6 +116,7 @@ export function ComparisonControls({
             )
           }
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[13px] text-[var(--text)] outline-none"
+          aria-busy={isChartLoading}
         >
           {options.map((president) => (
             <option key={president.id} value={president.id}>
@@ -127,6 +137,7 @@ export function ComparisonControls({
             )
           }
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[13px] text-[var(--text)] outline-none"
+          aria-busy={isChartLoading}
         >
           {options.map((president) => (
             <option key={president.id} value={president.id}>
