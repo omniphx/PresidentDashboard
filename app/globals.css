@@ -29,13 +29,10 @@ body {
   min-height: 100vh;
   color: var(--text);
   font-family:
-    "IBM Plex Mono",
-    "JetBrains Mono",
-    "SFMono-Regular",
-    "Menlo",
-    "Consolas",
-    "Liberation Mono",
-    monospace;
+    var(--font-sans),
+    "Avenir Next",
+    "Segoe UI",
+    sans-serif;
 }
 
 a {
