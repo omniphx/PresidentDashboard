@@ -33,7 +33,7 @@ export function BenchmarkTabs({
             onChange={(event) =>
               router.push(buildHref(event.target.value as BenchmarkId))
             }
-            className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 !text-sm font-medium tracking-[0.08em] text-[var(--text)]"
+            className="rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[13px] font-medium tracking-[0.06em] text-[var(--text)]"
             aria-label="Select series"
           >
             {benchmarks.map((benchmark) => (
@@ -44,7 +44,7 @@ export function BenchmarkTabs({
           </select>
         </label>
       </div>
-      <div className="hidden flex-wrap gap-2 md:flex md:gap-3">
+      <div className="hidden flex-wrap gap-2 md:flex">
         {benchmarks.map((benchmark) => {
           const isActive = benchmark.id === activeBenchmarkId;
 
@@ -52,10 +52,10 @@ export function BenchmarkTabs({
             <Link
               key={benchmark.id}
               href={buildHref(benchmark.id)}
-              className={`inline-flex min-w-[11.5rem] items-center justify-center rounded-full border px-4 py-2 text-center !text-sm uppercase tracking-[0.22em] transition ${
+              className={`inline-flex min-w-[9.25rem] items-center justify-center rounded-full border px-3 py-1.5 text-center text-[13px] uppercase tracking-[0.16em] transition ${
                 isActive
-                  ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)] shadow-[0_8px_24px_rgba(187,77,0,0.14)]"
-                  : "pill border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:text-[var(--text)]"
+                  ? "border-[rgba(122,47,0,0.22)] bg-[rgba(187,77,0,0.06)] text-[var(--accent-strong)]"
+                  : "pill border-[var(--line)] bg-white/55 text-[var(--muted)] hover:border-[var(--line-strong)] hover:text-[var(--text)]"
               }`}
             >
               {benchmark.label}
