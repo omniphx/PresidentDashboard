@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ACTIVE_PRESIDENT_REVALIDATE_SECONDS,
   buildAbsoluteSeries,
   buildRelativeSeries,
   calculateTermPerformance,
+  PRESIDENT_REVALIDATE_SECONDS,
+  getPresidentCacheTtlSeconds,
+  getPresidentsCacheTtlSeconds,
   normalizeComparisonIds,
 } from "@/lib/market";
 import type { PricePoint, ScoreboardEntry } from "@/lib/types";
@@ -203,5 +207,21 @@ describe("normalizeComparisonIds", () => {
       leftId: "trump-47",
       rightId: "obama",
     });
+  });
+});
+
+describe("cache TTL helpers", () => {
+  it("uses a 30 day TTL for completed presidencies", () => {
+    expect(getPresidentCacheTtlSeconds("obama")).toBe(PRESIDENT_REVALIDATE_SECONDS);
+  });
+
+  it("uses an hourly TTL for the active presidency", () => {
+    expect(getPresidentCacheTtlSeconds("trump-47")).toBe(ACTIVE_PRESIDENT_REVALIDATE_SECONDS);
+  });
+
+  it("uses the shorter TTL when any requested president is active", () => {
+    expect(getPresidentsCacheTtlSeconds(["obama", "trump-47"])).toBe(
+      ACTIVE_PRESIDENT_REVALIDATE_SECONDS,
+    );
   });
 });

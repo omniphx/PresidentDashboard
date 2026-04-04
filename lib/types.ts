@@ -86,3 +86,11 @@ export type TermMarketPerformance = {
 export type ScoreboardEntry = PresidentTerm & {
   performance: TermMarketPerformance;
 };
+
+export type PresidentChartPayload = {
+  benchmark: Benchmark;
+  chartMode: ComparisonChartMode;
+  entry: ScoreboardEntry;
+  series: ComparisonPricePoint[];
+  comparisonValue: number | null;
+};

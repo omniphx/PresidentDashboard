@@ -7,12 +7,10 @@ import { PerformanceChart } from "@/components/performance-chart";
 import { PresidentTable } from "@/components/president-table";
 import { getBenchmark } from "@/lib/benchmarks";
 import {
-  buildAbsoluteSeries,
-  buildRelativeSeries,
-  getComparison,
   getLiveQuote,
   getAvailableComparisonIds,
   getDefaultComparisonIds,
+  getPresidentChartData,
   normalizeComparisonIds,
   getScoreboard,
 } from "@/lib/market";
@@ -50,22 +48,33 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     ? normalizedComparisonIds.rightId
     : defaults.rightId;
 
-  const [scoreboardResult, comparisonResult, quoteResult] =
+  const [scoreboardResult, leftChartResult, rightChartResult, quoteResult] =
     await Promise.allSettled([
       getScoreboard(benchmark.id),
-      getComparison(benchmark.id, resolvedLeftId, resolvedRightId),
+      getPresidentChartData(benchmark.id, resolvedLeftId, chartMode),
+      getPresidentChartData(benchmark.id, resolvedRightId, chartMode),
       getLiveQuote(benchmark.id),
     ]);
   const scoreboard =
     scoreboardResult.status === "fulfilled" ? scoreboardResult.value : [];
-  const comparison =
-    comparisonResult.status === "fulfilled" ? comparisonResult.value : null;
+  const leftChart =
+    leftChartResult.status === "fulfilled" ? leftChartResult.value : null;
+  const rightChart =
+    rightChartResult.status === "fulfilled" ? rightChartResult.value : null;
   const quote = quoteResult.status === "fulfilled" ? quoteResult.value : null;
   const historyError =
     scoreboardResult.status === "rejected"
       ? scoreboardResult.reason instanceof Error
         ? scoreboardResult.reason.message
         : "Unknown market history error."
+      : leftChartResult.status === "rejected"
+        ? leftChartResult.reason instanceof Error
+          ? leftChartResult.reason.message
+          : "Unknown left comparison error."
+        : rightChartResult.status === "rejected"
+          ? rightChartResult.reason instanceof Error
+            ? rightChartResult.reason.message
+            : "Unknown right comparison error."
       : undefined;
   const quoteError =
     quoteResult.status === "rejected"
@@ -174,32 +183,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </div>
           </div>
         </section>
-        {comparison ? (
+        {leftChart && rightChart ? (
           <PerformanceChart
             benchmark={benchmark}
             chartMode={chartMode}
-            left={comparison.left}
-            right={comparison.right}
-            leftSeries={
-              chartMode === "absolute"
-                ? buildAbsoluteSeries(comparison.left)
-                : buildRelativeSeries(comparison.left)
-            }
-            rightSeries={
-              chartMode === "absolute"
-                ? buildAbsoluteSeries(comparison.right)
-                : buildRelativeSeries(comparison.right)
-            }
-            leftComparisonValue={
-              chartMode === "absolute"
-                ? comparison.left.performance.endValue
-                : comparison.leftComparisonReturnPct
-            }
-            rightComparisonValue={
-              chartMode === "absolute"
-                ? comparison.right.performance.endValue
-                : comparison.rightComparisonReturnPct
-            }
+            left={leftChart.entry}
+            right={rightChart.entry}
+            leftSeries={leftChart.series}
+            rightSeries={rightChart.series}
+            leftComparisonValue={leftChart.comparisonValue}
+            rightComparisonValue={rightChart.comparisonValue}
           />
         ) : null}
         <section className="grid gap-4 lg:grid-cols-[1.05fr_1fr]">

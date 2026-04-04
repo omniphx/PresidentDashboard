@@ -9,6 +9,7 @@ import type {
   ComparisonChartMode,
   ComparisonPricePoint,
   MetricSnapshot,
+  PresidentChartPayload,
   PricePoint,
   ScoreboardEntry,
   TermMarketPerformance,
@@ -18,6 +19,9 @@ const FMP_BASE_URL = "https://financialmodelingprep.com/stable";
 const FRED_API_URL = "https://api.stlouisfed.org/fred/series/observations";
 const HISTORY_CACHE_VERSION = "macro-v4";
 const HISTORY_REVALIDATE_SECONDS = 60 * 60 * 24;
+export const PRESIDENT_CACHE_VERSION = "president-v1";
+export const PRESIDENT_REVALIDATE_SECONDS = 60 * 60 * 24 * 30;
+export const ACTIVE_PRESIDENT_REVALIDATE_SECONDS = 60 * 60;
 
 function getMarketApiKey() {
   const apiKey = process.env.FMP_API_KEY;
@@ -207,10 +211,18 @@ export async function getHistoricalSeries(benchmarkId: BenchmarkId) {
   return cachedSeries();
 }
 
-function getPerformanceRevalidateWindow(presidentId: string) {
+export function getPresidentCacheTtlSeconds(presidentId: string) {
   const president = getPresident(presidentId);
 
-  return president.endDate ? HISTORY_REVALIDATE_SECONDS : 60 * 15;
+  return president.endDate ? PRESIDENT_REVALIDATE_SECONDS : ACTIVE_PRESIDENT_REVALIDATE_SECONDS;
+}
+
+export function getPresidentsCacheTtlSeconds(presidentIds: string[]) {
+  return presidentIds.some(
+    (presidentId) => getPresidentCacheTtlSeconds(presidentId) === ACTIVE_PRESIDENT_REVALIDATE_SECONDS,
+  )
+    ? ACTIVE_PRESIDENT_REVALIDATE_SECONDS
+    : PRESIDENT_REVALIDATE_SECONDS;
 }
 
 function pickCoverageSeries(series: PricePoint[], startDate: string, endDate: string) {
@@ -325,9 +337,9 @@ export async function getPresidentPerformance(
 ): Promise<ScoreboardEntry> {
   const cachedPerformance = unstable_cache(
     async () => computePresidentPerformance(benchmarkId, presidentId),
-    [`president-performance:${benchmarkId}:${presidentId}:${HISTORY_CACHE_VERSION}`],
+    [`president-performance:${benchmarkId}:${presidentId}:${PRESIDENT_CACHE_VERSION}`],
     {
-      revalidate: getPerformanceRevalidateWindow(presidentId),
+      revalidate: getPresidentCacheTtlSeconds(presidentId),
       tags: [`performance:${benchmarkId}`, `performance:${benchmarkId}:${presidentId}`],
     },
   );
@@ -336,15 +348,26 @@ export async function getPresidentPerformance(
 }
 
 export async function getScoreboard(benchmarkId: BenchmarkId): Promise<ScoreboardEntry[]> {
-  const entries = await Promise.all(
-    presidentTerms.map((president) => getPresidentPerformance(benchmarkId, president.id)),
+  const cachedScoreboard = unstable_cache(
+    async () => {
+      const entries = await Promise.all(
+        presidentTerms.map((president) => getPresidentPerformance(benchmarkId, president.id)),
+      );
+
+      return entries.sort((left, right) => {
+        const leftValue = left.performance.totalChange ?? Number.NEGATIVE_INFINITY;
+        const rightValue = right.performance.totalChange ?? Number.NEGATIVE_INFINITY;
+        return rightValue - leftValue;
+      });
+    },
+    [`scoreboard:${benchmarkId}:${PRESIDENT_CACHE_VERSION}`],
+    {
+      revalidate: getPresidentsCacheTtlSeconds(presidentTerms.map((president) => president.id)),
+      tags: [`performance:${benchmarkId}`, `scoreboard:${benchmarkId}`],
+    },
   );
 
-  return entries.sort((left, right) => {
-    const leftValue = left.performance.totalChange ?? Number.NEGATIVE_INFINITY;
-    const rightValue = right.performance.totalChange ?? Number.NEGATIVE_INFINITY;
-    return rightValue - leftValue;
-  });
+  return cachedScoreboard();
 }
 
 function getRelativeTermEndDate(entry: ScoreboardEntry) {
@@ -401,6 +424,40 @@ export function buildRelativeSeries(entry: ScoreboardEntry): ComparisonPricePoin
 
 export function buildAbsoluteSeries(entry: ScoreboardEntry): ComparisonPricePoint[] {
   return buildComparisonSeries(entry, "absolute");
+}
+
+export async function getPresidentChartData(
+  benchmarkId: BenchmarkId,
+  presidentId: string,
+  chartMode: ComparisonChartMode,
+): Promise<PresidentChartPayload> {
+  const normalizedPresidentId = getPresident(presidentId).id;
+  const cachedChartData = unstable_cache(
+    async () => {
+      const entry = await getPresidentPerformance(benchmarkId, normalizedPresidentId);
+      const series =
+        chartMode === "absolute" ? buildAbsoluteSeries(entry) : buildRelativeSeries(entry);
+
+      return {
+        benchmark: getBenchmark(benchmarkId),
+        chartMode,
+        entry,
+        series,
+        comparisonValue:
+          chartMode === "absolute" ? entry.performance.endValue : (series.at(-1)?.close ?? null),
+      };
+    },
+    [`president-chart:${benchmarkId}:${normalizedPresidentId}:${chartMode}:${PRESIDENT_CACHE_VERSION}`],
+    {
+      revalidate: getPresidentCacheTtlSeconds(normalizedPresidentId),
+      tags: [
+        `performance:${benchmarkId}:${normalizedPresidentId}`,
+        `president-chart:${benchmarkId}:${normalizedPresidentId}`,
+      ],
+    },
+  );
+
+  return cachedChartData();
 }
 
 async function getMacroSnapshot(benchmarkId: BenchmarkId): Promise<MetricSnapshot> {
@@ -474,23 +531,39 @@ export async function getLiveQuote(benchmarkId: BenchmarkId): Promise<MetricSnap
 export async function getComparison(benchmarkId: BenchmarkId, leftId: string, rightId: string) {
   const fallbackLeftId = getPresident(leftId).id;
   const fallbackRightId = getPresident(rightId).id;
-  const [left, right] = await Promise.all([
-    getPresidentPerformance(benchmarkId, fallbackLeftId),
-    getPresidentPerformance(benchmarkId, fallbackRightId),
-  ]);
+  const cachedComparison = unstable_cache(
+    async () => {
+      const [left, right] = await Promise.all([
+        getPresidentPerformance(benchmarkId, fallbackLeftId),
+        getPresidentPerformance(benchmarkId, fallbackRightId),
+      ]);
 
-  const leftRelativeSeries = buildRelativeSeries(left);
-  const rightRelativeSeries = buildRelativeSeries(right);
+      const leftRelativeSeries = buildRelativeSeries(left);
+      const rightRelativeSeries = buildRelativeSeries(right);
 
-  return {
-    benchmark: getBenchmark(benchmarkId),
-    left,
-    right,
-    leftRelativeSeries,
-    rightRelativeSeries,
-    leftComparisonReturnPct: leftRelativeSeries.at(-1)?.close ?? null,
-    rightComparisonReturnPct: rightRelativeSeries.at(-1)?.close ?? null,
-  };
+      return {
+        benchmark: getBenchmark(benchmarkId),
+        left,
+        right,
+        leftRelativeSeries,
+        rightRelativeSeries,
+        leftComparisonReturnPct: leftRelativeSeries.at(-1)?.close ?? null,
+        rightComparisonReturnPct: rightRelativeSeries.at(-1)?.close ?? null,
+      };
+    },
+    [`comparison:${benchmarkId}:${fallbackLeftId}:${fallbackRightId}:${PRESIDENT_CACHE_VERSION}`],
+    {
+      revalidate: getPresidentsCacheTtlSeconds([fallbackLeftId, fallbackRightId]),
+      tags: [
+        `comparison:${benchmarkId}`,
+        `comparison:${benchmarkId}:${fallbackLeftId}:${fallbackRightId}`,
+        `performance:${benchmarkId}:${fallbackLeftId}`,
+        `performance:${benchmarkId}:${fallbackRightId}`,
+      ],
+    },
+  );
+
+  return cachedComparison();
 }
 
 export function getAvailableComparisonIds(benchmarkId: BenchmarkId) {

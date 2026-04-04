@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
-
+import { jsonWithCache } from "@/lib/api";
 import { benchmarks } from "@/lib/benchmarks";
+import { PRESIDENT_REVALIDATE_SECONDS } from "@/lib/market";
 
 export async function GET() {
-  return NextResponse.json(benchmarks);
+  return jsonWithCache(benchmarks, PRESIDENT_REVALIDATE_SECONDS);
 }

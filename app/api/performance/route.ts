@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { jsonWithCache } from "@/lib/api";
 import { getBenchmark } from "@/lib/benchmarks";
-import { getPresidentPerformance, getScoreboard } from "@/lib/market";
+import {
+  getPresidentCacheTtlSeconds,
+  getPresidentPerformance,
+  getPresidentsCacheTtlSeconds,
+  getScoreboard,
+} from "@/lib/market";
+import { presidentTerms } from "@/lib/presidents";
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,11 +18,14 @@ export async function GET(request: NextRequest) {
 
     if (presidentId) {
       const performance = await getPresidentPerformance(benchmark.id, presidentId);
-      return NextResponse.json(performance);
+      return jsonWithCache(performance, getPresidentCacheTtlSeconds(performance.id));
     }
 
     const scoreboard = await getScoreboard(benchmark.id);
-    return NextResponse.json(scoreboard);
+    return jsonWithCache(
+      scoreboard,
+      getPresidentsCacheTtlSeconds(presidentTerms.map((president) => president.id)),
+    );
   } catch (error) {
     return NextResponse.json(
       {

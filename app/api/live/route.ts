@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { jsonWithCache } from "@/lib/api";
 import { getBenchmark } from "@/lib/benchmarks";
 import { getLiveQuote } from "@/lib/market";
 
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
     const benchmark = getBenchmark(benchmarkId);
     const quote = await getLiveQuote(benchmark.id);
 
-    return NextResponse.json(quote);
+    return jsonWithCache(quote, 60 * 5);
   } catch (error) {
     return NextResponse.json(
       {

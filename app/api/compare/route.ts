@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { jsonWithCache } from "@/lib/api";
 import { getBenchmark } from "@/lib/benchmarks";
-import { getComparison, getDefaultComparisonIds } from "@/lib/market";
+import { getComparison, getDefaultComparisonIds, getPresidentsCacheTtlSeconds } from "@/lib/market";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +13,10 @@ export async function GET(request: NextRequest) {
     const rightId = request.nextUrl.searchParams.get("rightPresidentId") ?? defaults.rightId;
     const comparison = await getComparison(benchmark.id, leftId, rightId);
 
-    return NextResponse.json(comparison);
+    return jsonWithCache(
+      comparison,
+      getPresidentsCacheTtlSeconds([comparison.left.id, comparison.right.id]),
+    );
   } catch (error) {
     return NextResponse.json(
       {
