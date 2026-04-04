@@ -1,3 +1,4 @@
+import { buildComparisonChartModel } from "@/lib/chart";
 import { formatMetricChange, formatMetricValue } from "@/lib/format";
 import type { Benchmark, ComparisonChartMode, ComparisonPricePoint, ScoreboardEntry } from "@/lib/types";
 
@@ -12,27 +13,6 @@ type PerformanceChartProps = {
   rightComparisonValue: number | null;
 };
 
-function buildPath(
-  series: ComparisonPricePoint[],
-  width: number,
-  height: number,
-  min: number,
-  max: number,
-  maxElapsedDays: number,
-) {
-  if (series.length === 0 || max === min || maxElapsedDays <= 0) {
-    return "";
-  }
-
-  return series
-    .map((point, index) => {
-      const x = (point.elapsedDays / maxElapsedDays) * width;
-      const y = height - ((point.close - min) / (max - min)) * height;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
-}
-
 export function PerformanceChart({
   benchmark,
   chartMode,
@@ -43,27 +23,12 @@ export function PerformanceChart({
   leftComparisonValue,
   rightComparisonValue,
 }: PerformanceChartProps) {
-  const width = 920;
-  const height = 320;
-  const chartLeft = 72;
-  const chartRight = 16;
-  const chartTop = 12;
-  const chartBottom = 34;
-  const plotWidth = width - chartLeft - chartRight;
-  const plotHeight = height - chartTop - chartBottom;
-  const values = [...leftSeries, ...rightSeries].map((point) => point.close);
-  const maxElapsedDays = Math.max(
-    leftSeries.at(-1)?.elapsedDays ?? 0,
-    rightSeries.at(-1)?.elapsedDays ?? 0,
-    365,
-  );
-  const maxElapsedYears = Math.max(1, Math.floor(maxElapsedDays / 365));
-  const defaultMin = chartMode === "relative" ? 0 : 0;
-  const defaultMax = chartMode === "relative" ? (benchmark.changeDisplay === "points" ? 1 : 5) : 1;
-  const rawMin = values.length > 0 ? Math.min(...values) : defaultMin;
-  const rawMax = values.length > 0 ? Math.max(...values) : defaultMax;
-  const min = chartMode === "relative" ? Math.min(rawMin, 0) : rawMin;
-  const max = chartMode === "relative" ? Math.max(rawMax, defaultMax) : rawMax === rawMin ? rawMax + 1 : rawMax;
+  const chart = buildComparisonChartModel({
+    benchmark,
+    chartMode,
+    leftSeries,
+    rightSeries,
+  });
   const chartTitle = chartMode === "relative" ? "Relative term change" : "Absolute term values";
   const chartDescription =
     chartMode === "relative"
@@ -73,24 +38,6 @@ export function PerformanceChart({
     chartMode === "relative"
       ? "Lines are aligned by years since inauguration. Longer presidencies extend farther across the x-axis, and ongoing terms only extend through the years completed so far."
       : "Lines are aligned by years since inauguration and keep each series on its original scale, so level differences stay visible across presidencies.";
-
-  const leftPath = buildPath(leftSeries, plotWidth, plotHeight, min, max, maxElapsedDays);
-  const rightPath = buildPath(rightSeries, plotWidth, plotHeight, min, max, maxElapsedDays);
-  const ticks = [max, (max + min) / 2, min];
-  const yearTicks = Array.from({ length: maxElapsedYears + 1 }, (_, index) => ({
-    label: index === 0 ? "Year 0" : `Year ${index}`,
-    elapsedDays: index * 365,
-  })).filter((tick, index, ticks) => {
-    if (index === 0) {
-      return true;
-    }
-
-    const isWithinRange = tick.elapsedDays <= maxElapsedDays;
-    const previousTick = ticks[index - 1];
-
-    return isWithinRange && tick.elapsedDays > previousTick.elapsedDays;
-  });
-
   return (
     <section className="panel-strong rounded-3xl p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -120,19 +67,27 @@ export function PerformanceChart({
       </div>
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--line)] bg-white/60 p-4">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[320px] w-full">
-          {yearTicks.map((tick) => {
-            const x = chartLeft + Math.min(tick.elapsedDays / maxElapsedDays, 1) * plotWidth;
+        <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-[320px] w-full">
+          {chart.yearTicks.map((tick) => {
+            const x =
+              chart.chartLeft +
+              Math.min(tick.elapsedDays / chart.maxElapsedDays, 1) * chart.plotWidth;
             return (
               <g key={tick.label}>
-                <line x1={x} x2={x} y1={chartTop} y2={chartTop + plotHeight} stroke="rgba(70,48,18,0.08)" />
+                <line
+                  x1={x}
+                  x2={x}
+                  y1={chart.chartTop}
+                  y2={chart.chartTop + chart.plotHeight}
+                  stroke="rgba(70,48,18,0.08)"
+                />
                 <text
                   x={x}
-                  y={height - 8}
+                  y={chart.height - 8}
                   textAnchor={
                     tick.elapsedDays === 0
                       ? "start"
-                      : tick.elapsedDays >= maxElapsedDays
+                      : tick.elapsedDays >= chart.maxElapsedDays
                         ? "end"
                         : "middle"
                   }
@@ -144,19 +99,27 @@ export function PerformanceChart({
               </g>
             );
           })}
-          {ticks.map((tick) => {
-            const y = chartTop + (plotHeight - ((tick - min) / (max - min || 1)) * plotHeight);
+          {chart.ticks.map((tick) => {
+            const y =
+              chart.chartTop +
+              (chart.plotHeight -
+                ((tick - chart.min) / (chart.max - chart.min || 1)) * chart.plotHeight);
             return (
               <g key={tick}>
                 <line
-                  x1={chartLeft}
-                  x2={chartLeft + plotWidth}
+                  x1={chart.chartLeft}
+                  x2={chart.chartLeft + chart.plotWidth}
                   y1={y}
                   y2={y}
                   stroke="rgba(70,48,18,0.14)"
                   strokeDasharray="6 8"
                 />
-                <text x="0" y={Math.max(chartTop + 12, y - 8)} fill="rgba(70,48,18,0.68)" fontSize="12">
+                <text
+                  x="0"
+                  y={Math.max(chart.chartTop + 12, y - 8)}
+                  fill="rgba(70,48,18,0.68)"
+                  fontSize="12"
+                >
                   {chartMode === "relative"
                     ? formatMetricChange(benchmark, tick)
                     : formatMetricValue(benchmark, tick)}
@@ -164,9 +127,9 @@ export function PerformanceChart({
               </g>
             );
           })}
-          <g transform={`translate(${chartLeft} ${chartTop})`}>
-            <path d={leftPath} fill="none" stroke="#f97316" strokeWidth="3" strokeLinecap="round" />
-            <path d={rightPath} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
+          <g transform={`translate(${chart.chartLeft} ${chart.chartTop})`}>
+            <path d={chart.leftPath} fill="none" stroke="#f97316" strokeWidth="3" strokeLinecap="round" />
+            <path d={chart.rightPath} fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
           </g>
         </svg>
       </div>

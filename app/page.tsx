@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { BenchmarkTabs } from "@/components/benchmark-tabs";
 import { ComparisonControls } from "@/components/comparison-controls";
 import { DataStatus } from "@/components/data-status";
@@ -5,48 +7,69 @@ import { KpiCards } from "@/components/kpi-cards";
 import { LiveQuoteCard } from "@/components/live-quote-card";
 import { PerformanceChart } from "@/components/performance-chart";
 import { PresidentTable } from "@/components/president-table";
-import { getBenchmark } from "@/lib/benchmarks";
+import { getHomePageState } from "@/lib/home-state";
 import {
   getLiveQuote,
   getAvailableComparisonIds,
-  getDefaultComparisonIds,
   getPresidentChartData,
-  normalizeComparisonIds,
   getScoreboard,
 } from "@/lib/market";
-import type { BenchmarkId, ComparisonChartMode } from "@/lib/types";
+import { getSiteUrl } from "@/lib/site-url";
 
 type HomePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+export async function generateMetadata({
+  searchParams,
+}: HomePageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const { benchmark, chartMode, resolvedLeftId, resolvedRightId } =
+    getHomePageState(params);
+  const [leftChart, rightChart] = await Promise.all([
+    getPresidentChartData(benchmark.id, resolvedLeftId, chartMode),
+    getPresidentChartData(benchmark.id, resolvedRightId, chartMode),
+  ]);
+  const title = `${leftChart.entry.displayName} vs ${rightChart.entry.displayName} | ${benchmark.label}`;
+  const description = `Compare ${leftChart.entry.displayName} and ${rightChart.entry.displayName} on ${benchmark.label} with a ${chartMode} presidential performance chart.`;
+  const imageUrl = new URL("/api/og", getSiteUrl());
+
+  imageUrl.searchParams.set("benchmark", benchmark.id);
+  imageUrl.searchParams.set("left", resolvedLeftId);
+  imageUrl.searchParams.set("right", resolvedRightId);
+  imageUrl.searchParams.set("mode", chartMode);
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      images: [
+        {
+          url: imageUrl.toString(),
+          width: 1200,
+          height: 630,
+          alt: `${leftChart.entry.displayName} versus ${rightChart.entry.displayName} on ${benchmark.label}`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [imageUrl.toString()],
+    },
+  };
+}
+
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
-  const benchmarkId = (
-    Array.isArray(params.benchmark) ? params.benchmark[0] : params.benchmark
-  ) as BenchmarkId | undefined;
-  const benchmark = getBenchmark(benchmarkId);
-  const defaults = getDefaultComparisonIds(benchmark.id);
-  const leftId = Array.isArray(params.left)
-    ? params.left[0]
-    : (params.left ?? defaults.leftId);
-  const rightId = Array.isArray(params.right)
-    ? params.right[0]
-    : (params.right ?? defaults.rightId);
-  const chartModeParam = Array.isArray(params.mode)
-    ? params.mode[0]
-    : params.mode;
-  const chartMode: ComparisonChartMode =
-    chartModeParam === "absolute" ? "absolute" : "relative";
+  const { benchmark, chartMode, resolvedLeftId, resolvedRightId } =
+    getHomePageState(params);
   const availableComparisonIds = getAvailableComparisonIds(benchmark.id);
   const hasAvailableComparisons = availableComparisonIds.length > 0;
-  const normalizedComparisonIds = normalizeComparisonIds(benchmark.id, leftId, rightId);
-  const resolvedLeftId = hasAvailableComparisons
-    ? normalizedComparisonIds.leftId
-    : defaults.leftId;
-  const resolvedRightId = hasAvailableComparisons
-    ? normalizedComparisonIds.rightId
-    : defaults.rightId;
 
   const [scoreboardResult, leftChartResult, rightChartResult, quoteResult] =
     await Promise.allSettled([

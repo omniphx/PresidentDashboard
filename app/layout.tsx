@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 
 import "@/app/globals.css";
+import { getSiteUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
+  metadataBase: getSiteUrl(),
   title: "Presidential Markets",
   description: "An edgy dashboard for comparing U.S. presidents against major market benchmarks.",
 };
