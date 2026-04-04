@@ -31,7 +31,9 @@ export function BenchmarkTabs({
           <select
             value={activeBenchmarkId}
             onChange={(event) =>
-              router.push(buildHref(event.target.value as BenchmarkId))
+              router.push(buildHref(event.target.value as BenchmarkId), {
+                scroll: false,
+              })
             }
             className="rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[13px] font-medium tracking-[0.06em] text-[var(--text)]"
             aria-label="Select series"
@@ -52,6 +54,7 @@ export function BenchmarkTabs({
             <Link
               key={benchmark.id}
               href={buildHref(benchmark.id)}
+              scroll={false}
               className={`inline-flex min-w-[9.25rem] items-center justify-center rounded-full border px-3 py-1.5 text-center text-[13px] uppercase tracking-[0.16em] transition ${
                 isActive
                   ? "border-[rgba(122,47,0,0.22)] bg-[rgba(187,77,0,0.06)] text-[var(--accent-strong)]"

@@ -34,7 +34,7 @@ export function ComparisonControls({
       mode: nextMode,
     });
 
-    router.push(`/?${params.toString()}`);
+    router.push(`/?${params.toString()}`, { scroll: false });
   };
 
   return (
