@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { startTransition, useOptimistic } from "react";
 import { useRouter } from "next/navigation";
 
 import { benchmarks } from "@/lib/benchmarks";
@@ -20,8 +20,18 @@ export function BenchmarkTabs({
   chartMode,
 }: BenchmarkTabsProps) {
   const router = useRouter();
+  const [optimisticBenchmarkId, setOptimisticBenchmarkId] = useOptimistic(
+    activeBenchmarkId,
+    (_currentBenchmarkId, nextBenchmarkId: BenchmarkId) => nextBenchmarkId,
+  );
   const buildHref = (benchmarkId: BenchmarkId) =>
     `/?benchmark=${benchmarkId}&left=${leftId}&right=${rightId}&mode=${chartMode}`;
+  const navigate = (benchmarkId: BenchmarkId) => {
+    startTransition(() => {
+      setOptimisticBenchmarkId(benchmarkId);
+      router.push(buildHref(benchmarkId), { scroll: false });
+    });
+  };
 
   return (
     <>
@@ -29,12 +39,8 @@ export function BenchmarkTabs({
         <label className="grid gap-2 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
           Select Series
           <select
-            value={activeBenchmarkId}
-            onChange={(event) =>
-              router.push(buildHref(event.target.value as BenchmarkId), {
-                scroll: false,
-              })
-            }
+            value={optimisticBenchmarkId}
+            onChange={(event) => navigate(event.target.value as BenchmarkId)}
             className="rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[13px] font-medium tracking-[0.06em] text-[var(--text)]"
             aria-label="Select series"
           >
@@ -48,21 +54,22 @@ export function BenchmarkTabs({
       </div>
       <div className="hidden flex-wrap gap-2 md:flex">
         {benchmarks.map((benchmark) => {
-          const isActive = benchmark.id === activeBenchmarkId;
+          const isActive = benchmark.id === optimisticBenchmarkId;
 
           return (
-            <Link
+            <button
               key={benchmark.id}
-              href={buildHref(benchmark.id)}
-              scroll={false}
+              type="button"
+              onClick={() => navigate(benchmark.id)}
               className={`inline-flex min-w-[9.25rem] items-center justify-center rounded-full border px-3 py-1.5 text-center text-[13px] uppercase tracking-[0.16em] transition ${
                 isActive
                   ? "border-[rgba(122,47,0,0.22)] bg-[rgba(187,77,0,0.06)] text-[var(--accent-strong)]"
                   : "pill border-[var(--line)] bg-white/55 text-[var(--muted)] hover:border-[var(--line-strong)] hover:text-[var(--text)]"
               }`}
+              aria-pressed={isActive}
             >
               {benchmark.label}
-            </Link>
+            </button>
           );
         })}
       </div>

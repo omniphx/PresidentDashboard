@@ -1,5 +1,6 @@
 "use client";
 
+import { startTransition, useOptimistic } from "react";
 import { useRouter } from "next/navigation";
 
 import type { ComparisonChartMode } from "@/lib/types";
@@ -25,8 +26,23 @@ export function ComparisonControls({
   options,
 }: ComparisonControlsProps) {
   const router = useRouter();
+  const [optimisticSelection, setOptimisticSelection] = useOptimistic(
+    { leftId, rightId, chartMode },
+    (
+      _currentSelection,
+      nextSelection: {
+        leftId: string;
+        rightId: string;
+        chartMode: ComparisonChartMode;
+      },
+    ) => nextSelection,
+  );
 
-  const navigate = (nextLeftId: string, nextRightId: string, nextMode: ComparisonChartMode) => {
+  const navigate = (
+    nextLeftId: string,
+    nextRightId: string,
+    nextMode: ComparisonChartMode,
+  ) => {
     const params = new URLSearchParams({
       benchmark: benchmarkId,
       left: nextLeftId,
@@ -34,7 +50,14 @@ export function ComparisonControls({
       mode: nextMode,
     });
 
-    router.push(`/?${params.toString()}`, { scroll: false });
+    startTransition(() => {
+      setOptimisticSelection({
+        leftId: nextLeftId,
+        rightId: nextRightId,
+        chartMode: nextMode,
+      });
+      router.push(`/?${params.toString()}`, { scroll: false });
+    });
   };
 
   return (
@@ -46,13 +69,19 @@ export function ComparisonControls({
             { value: "relative", label: "Relative" },
             { value: "absolute", label: "Absolute" },
           ].map((option) => {
-            const checked = chartMode === option.value;
+            const checked = optimisticSelection.chartMode === option.value;
 
             return (
               <button
                 key={option.value}
                 type="button"
-                onClick={() => navigate(leftId, rightId, option.value as ComparisonChartMode)}
+                onClick={() =>
+                  navigate(
+                    optimisticSelection.leftId,
+                    optimisticSelection.rightId,
+                    option.value as ComparisonChartMode,
+                  )
+                }
                 className={`flex min-h-9 cursor-pointer items-center justify-center rounded-lg px-2.5 py-1.5 text-[13px] font-medium tracking-[0.05em] transition ${
                   checked
                     ? "bg-[rgba(187,77,0,0.08)] text-[var(--accent-strong)] ring-1 ring-inset ring-[rgba(122,47,0,0.12)]"
@@ -69,8 +98,14 @@ export function ComparisonControls({
       <label className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
         Compare Left
         <select
-          value={leftId}
-          onChange={(event) => navigate(event.target.value, rightId, chartMode)}
+          value={optimisticSelection.leftId}
+          onChange={(event) =>
+            navigate(
+              event.target.value,
+              optimisticSelection.rightId,
+              optimisticSelection.chartMode,
+            )
+          }
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[13px] text-[var(--text)] outline-none"
         >
           {options.map((president) => (
@@ -83,8 +118,14 @@ export function ComparisonControls({
       <label className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
         Compare Right
         <select
-          value={rightId}
-          onChange={(event) => navigate(leftId, event.target.value, chartMode)}
+          value={optimisticSelection.rightId}
+          onChange={(event) =>
+            navigate(
+              optimisticSelection.leftId,
+              event.target.value,
+              optimisticSelection.chartMode,
+            )
+          }
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[13px] text-[var(--text)] outline-none"
         >
           {options.map((president) => (
